@@ -55,7 +55,9 @@ ENDM
 ; Returns:
 ; ---------------------------------------------------------------------------------
 mDisplayString MACRO
-
+_nextInString:
+	mov		edx, [ebp + 12]
+	call	WriteString
 ENDM
 
 ; Constants
@@ -124,7 +126,7 @@ _notValid:
 	call	WriteString
 	jmp		_programLoop
 _resume:
-	mov		esi, offset validatedInput
+	mov		SDWORD ptr esi, offset validatedInput
 	mov		edx, [esi]
 	mov		[edi], edx
 	add		edi, 4						; Register intirect updating the next pointer to the next array element
@@ -132,9 +134,15 @@ _resume:
 	jmp		_programLoop
 _end:
 	; End of getting user data - Next is to Display these values using WriteVal
+	push	offset signBool
 	push	offset asciiOutBuffer
 	push	offset validInputs
 	call	WriteVal
+
+	push	offset theSumOfNums
+	push	offset validInputs
+	call	calcSum
+
 	Invoke ExitProcess,0				; exit to operating system
 main ENDP
 
@@ -252,17 +260,88 @@ _end:
 	ret	32
 ReadVal	ENDP
 
+calcSum PROC
+	push	ebp
+	mov		ebp, esp
+	call	Crlf
+	mDisplayString
+	pushad
+	mov		edi, [ebp + 8]
+	mov		ecx, 0
+	mov		edx, 0
+_sum:
+	mov		eax, [edi]
+	mov		ebx, [edi + TYPE validInputs]
+	add		eax, ebx
+	add		edx, eax
+	add		ecx, 2
+	cmp		ecx, 10
+	je		_endOfSum
+	add		edi, 2*TYPE validInputs
+	jmp		_sum
+_endOfSum:
+	mov		eax, edx
+	call	WriteInt
+
+	popad
+	pop		ebp
+	ret		8
+calcSum	ENDP	
+
+
 WriteVal PROC
 	push	ebp
 	mov		ebp, esp
-	
-	; Conversion
+	push	edi
+	mov		edi, [ebp + 12]
+	mov		ebx, 10
+	mov		ecx, 0
+_divStart:
+	mov		esi, [ebp + 8]
+	mov		eax, [esi]
+	cmp		eax, 0
+	jl		_invert
+_resumeWithDiv:
+	cld
+_divRemaining:
+	inc		ecx
+	mov		edx, 0
+	idiv	ebx
+	push	edx
+	cmp		edx, 1
+	je		_doneDiv
+	jmp		_divRemaining
+_invert:
+	push	eax
+	push	esi
+	mov		esi, [ebp + 16]
+	mov		eax, 1
+	mov		[esi], eax
+	pop		esi
+	pop		eax
+	neg		eax
+	jmp		_resumeWithDiv
+_doneDiv:
+	push	edi
+	push	ebx
+	mov		edi, [ebp + 16]
+	mov		ebx, [edi]
+	cmp		ebx, 1
+	pop		ebx
+	pop		edi
+	je		_addSign
+_addSign:
+	mov		eax, 45
+	stosb
+_resumeBufferAdding:
+	pop		eax
+	stosb
+	loop	_resumeBufferAdding
 
-
+	mDisplayString
+	pop		edi
 	pop		ebp
-	ret 8
+	ret		12
 writeVal ENDP
-
-
 
 END main
