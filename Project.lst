@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
+Microsoft (R) Macro Assembler Version 14.28.29913.0	    06/03/21 17:36:33
 <Designing low-level I/O procedures      (Proj6_934329706.as  Page 1 - 1
 
 
@@ -53,7 +53,7 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
 					call	WriteString
 					; Read user input string to inputBuffer
 					mov		edx, [ebp + 20]
-					mov		ecx, SIZEOF	inputBuffer
+					mov		ecx, 12							; Size of the input buffer
 					call	ReadString
 					; Store number of input bytes to the numbOfBytes mem location
 					mov		edi, [ebp + 24]
@@ -76,11 +76,16 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
 				; Returns:
 				; ---------------------------------------------------------------------------------
 				mDisplayString MACRO
-
+				_nextInString:
+					mov		edx, [ebp + 12]
+					call	WriteString
+					mov		al, ' '
+					call	WriteChar
 				ENDM
 
 				; Constants
  = 7FFFFFFF			MAX_SIZE_REG = 2147483647
+ = 80000000			MAX_NEG_SIZE_REG = 2147483648
 
  00000000			.data
 				; Prompts
@@ -219,10 +224,11 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
 
 				; Values
  0000027A 00000000		validatedInput	SDWORD	?				; Stores the validated input from ReadVal
+ 0000027E 00			arraySize		BYTE	?				; Stores the number of elements a user inputs
 
 				; Boolean Flags
- 0000027E 00			signBool		BYTE	0
- 0000027F 00			invalidBool		BYTE	0
+ 0000027F 00			signBool		BYTE	0
+ 00000280 00			invalidBool		BYTE	0
 
  00000000			.code
  00000000			main PROC
@@ -242,15 +248,15 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
  00000029  83 FB 0A			cmp		ebx, 10
  0000002C  74 53			je		_end
  0000002E  68 0000027A R		push	offset validatedInput		; Building stack frame to get 10 user inputs
- 00000033  68 0000027F R		push	offset invalidBool
- 00000038  68 0000027E R		push	offset signBool
+ 00000033  68 00000280 R		push	offset invalidBool
+ 00000038  68 0000027F R		push	offset signBool
  0000003D  68 0000026D R		push	offset numbOfBytes
  00000042  68 00000261 R		push	offset inputBuffer
  00000047  68 00000142 R		push	offset enterInteger
  0000004C  68 00000162 R		push	offset errorMsg
  00000051  68 000001B5 R		push	offset tryAgain
- 00000056  E8 0000003C			call	ReadVal
- 0000005B  80 3D 0000027F R		cmp		invalidBool, 1
+ 00000056  E8 00000062			call	ReadVal
+ 0000005B  80 3D 00000280 R		cmp		invalidBool, 1
 	   01
  00000062  74 02			je		_notValid
  00000064  EB 0C			jmp		_resume
@@ -259,7 +265,7 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
  0000006B  E8 00000000 E		call	WriteString
  00000070  EB B7			jmp		_programLoop
  00000072			_resume:
- 00000072  BE 0000027A R		mov		esi, offset validatedInput
+ 00000072  BE 0000027A R		mov		SDWORD ptr esi, offset validatedInput
  00000077  8B 16			mov		edx, [esi]
  00000079  89 17			mov		[edi], edx
  0000007B  83 C7 04			add		edi, 4						; Register intirect updating the next pointer to the next array element
@@ -267,13 +273,25 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
  0000007F  EB A8			jmp		_programLoop
  00000081			_end:
 					; End of getting user data - Next is to Display these values using WriteVal
- 00000081  68 0000026E R		push	offset asciiOutBuffer
- 00000086  68 00000239 R		push	offset validInputs
- 0000008B  E8 000000D0			call	WriteVal
+ 00000081  B9 0000000A			mov		ecx, 10
+ 00000086  BB 00000000			mov		ebx, 0
+ 0000008B			_loop:
+ 0000008B  68 0000027E R		push	offset arraySize
+ 00000090  68 0000027F R		push	offset signBool
+ 00000095  68 0000026E R		push	offset asciiOutBuffer
+ 0000009A  68 00000239 R		push	offset validInputs
+ 0000009F  E8 00000258			call	WriteVal
+ 000000A4  43				inc		ebx
+ 000000A5  E2 E4			loop	_loop
+
+ 000000A7  68 000001EE R		push	offset theSumOfNums
+ 000000AC  68 00000239 R		push	offset validInputs
+ 000000B1  E8 000000F8			call	calcSum
+
 					Invoke ExitProcess,0				; exit to operating system
- 00000090  6A 00	   *	    push   +000000000h
- 00000092  E8 00000000 E   *	    call   ExitProcess
- 00000097			main ENDP
+ 000000B6  6A 00	   *	    push   +000000000h
+ 000000B8  E8 00000000 E   *	    call   ExitProcess
+ 000000BD			main ENDP
 
 				; ---------------------------------------------------------------------------------
 				; Name: 
@@ -287,154 +305,397 @@ Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
 				;
 				; Returns:
 				; ---------------------------------------------------------------------------------
- 00000097			ReadVal PROC
- 00000097  55				push	ebp
- 00000098  8B EC			mov		ebp, esp
+ 000000BD			ReadVal PROC
+ 000000BD  55				push	ebp
+ 000000BE  8B EC			mov		ebp, esp
 					; Call the mGetString MACRO which will grab the user input
 					mGetString
- 0000009A  52		     1		push	edx
- 0000009B  51		     1		push	ecx
- 0000009C  50		     1		push	eax
- 0000009D  57		     1		push	edi
- 0000009E  8B 55 10	     1		mov		edx, [ebp+16]
- 000000A1  E8 00000000 E     1		call	WriteString
- 000000A6  8B 55 14	     1		mov		edx, [ebp + 20]
- 000000A9  B9 0000000C	     1		mov		ecx, SIZEOF	inputBuffer
- 000000AE  E8 00000000 E     1		call	ReadString
- 000000B3  8B 7D 18	     1		mov		edi, [ebp + 24]
- 000000B6  89 07	     1		mov		[edi], eax
- 000000B8  5F		     1		pop		edi
- 000000B9  58		     1		pop		eax
- 000000BA  59		     1		pop		ecx
- 000000BB  5A		     1		pop		edx
+ 000000C0  52		     1		push	edx
+ 000000C1  51		     1		push	ecx
+ 000000C2  50		     1		push	eax
+ 000000C3  57		     1		push	edi
+ 000000C4  8B 55 10	     1		mov		edx, [ebp+16]
+ 000000C7  E8 00000000 E     1		call	WriteString
+ 000000CC  8B 55 14	     1		mov		edx, [ebp + 20]
+ 000000CF  B9 0000000C	     1		mov		ecx, 12							; Size of the input buffer
+ 000000D4  E8 00000000 E     1		call	ReadString
+ 000000D9  8B 7D 18	     1		mov		edi, [ebp + 24]
+ 000000DC  89 07	     1		mov		[edi], eax
+ 000000DE  5F		     1		pop		edi
+ 000000DF  58		     1		pop		eax
+ 000000E0  59		     1		pop		ecx
+ 000000E1  5A		     1		pop		edx
 					
 					; Restting BoolFlags
- 000000BC  60				pushad
- 000000BD  8B 7D 20			mov		edi, [ebp + 32]				; Invalid Bool offset
- 000000C0  BA 00000000			mov		edx, 0
- 000000C5  89 17			mov		[edi], edx
- 000000C7  8B 7D 1C			mov		edi, [ebp + 28]
- 000000CA  89 17			mov		[edi], edx		
- 000000CC  61				popad
+ 000000E2  60				pushad
+ 000000E3  8B 7D 20			mov		edi, [ebp + 32]				; Invalid Bool offset
+ 000000E6  BA 00000000			mov		edx, 0
+ 000000EB  89 17			mov		[edi], edx
+ 000000ED  8B 7D 1C			mov		edi, [ebp + 28]
+ 000000F0  89 17			mov		[edi], edx		
+ 000000F2  61				popad
 
 					; Convert the string representation to the numerical representation
- 000000CD  60				pushad
- 000000CE  FC				cld
- 000000CF  8B 75 14			mov		esi, [ebp+20]				; inputBuffer offset
- 000000D2  8B 7D 18			mov		edi, [ebp+24]	
- 000000D5  8B 0F			mov		ecx, [edi]					; loads the number of bytes into ecx
- 000000D7  8B C1			mov		eax, ecx
- 000000D9  BA 00000000			mov		edx, 0
- 000000DE			_beginConversion:
- 000000DE  AC				lodsb
- 000000DF			_validate:
- 000000DF  3C 30			cmp		al, 48
- 000000E1  7C 20			jl		_checkSigns					; if the value is below 48 there is a chance that it is a sign entered by user (+/-)
- 000000E3  3C 39			cmp		al, 57		
- 000000E5  7F 36			jg		_invalid					; if user input is valid, program implements an algorithm similar to that in module 8
- 000000E7  50				push	eax
- 000000E8  51				push	ecx
- 000000E9  83 E8 30			sub		eax, 48
- 000000EC  50				push	eax
- 000000ED  B8 0000000A			mov		eax, 10
- 000000F2  8B CA			mov		ecx, edx
- 000000F4  F7 E1			mul		ecx
- 000000F6  8B C8			mov		ecx, eax
- 000000F8  58				pop		eax
- 000000F9  03 C1			add		eax, ecx
- 000000FB  8B D0			mov		edx, eax
- 000000FD  59				pop		ecx
- 000000FE  58				pop		eax
- 000000FF  E2 DD			loop	_beginConversion
- 00000101  EB 2A			jmp		_endConversion
- 00000103			_checkSigns:
- 00000103  3C 2D			cmp		al, 45
- 00000105  74 06			je		_setSign
- 00000107  3C 2B			cmp		al, 43
- 00000109  75 12			jne		_invalid
- 0000010B  E2 D1			loop	_beginConversion
- 0000010D			_setSign:
- 0000010D  57				push	edi
- 0000010E  50				push	eax
- 0000010F  8B 7D 1C			mov		edi, [ebp+28]
- 00000112  B8 00000001			mov		eax, 1
- 00000117  89 07			mov		[edi], eax
- 00000119  58				pop		eax
- 0000011A  5F				pop		edi
- 0000011B  E2 C1			loop	_beginConversion
- 0000011D			_invalid:
- 0000011D  57				push	edi
- 0000011E  50				push	eax
- 0000011F  8B 7D 20			mov		edi, [ebp + 32]					; Set the invalidBool to 1
- 00000122  B8 00000001			mov		eax, 1
- 00000127  89 07			mov		[edi], eax
+ 000000F3  60				pushad
+ 000000F4  FC				cld
+ 000000F5  8B 75 14			mov		esi, [ebp+20]				; inputBuffer offset
+ 000000F8  8B 7D 18			mov		edi, [ebp+24]	
+ 000000FB  8B 0F			mov		ecx, [edi]					; loads the number of bytes into ecx
+ 000000FD  8B C1			mov		eax, ecx
+ 000000FF  BA 00000000			mov		edx, 0
+ 00000104			_beginConversion:
+ 00000104  AC				lodsb
+ 00000105			_validate:
+ 00000105  3C 30			cmp		al, 48
+ 00000107  7C 29			jl		_checkSigns					; if the value is below 48 there is a chance that it is a sign entered by user (+/-)
+ 00000109  3C 39			cmp		al, 57		
+ 0000010B  7F 3F			jg		_invalid					; if user input is valid, program implements an algorithm similar to that in module 8
+ 0000010D  50				push	eax
+ 0000010E  51				push	ecx
+ 0000010F  83 E8 30			sub		eax, 48
+ 00000112  50				push	eax
+ 00000113  B8 0000000A			mov		eax, 10
+ 00000118  8B CA			mov		ecx, edx
+ 0000011A  F7 E1			mul		ecx
+ 0000011C  70 0B			jo		_overflow
+ 0000011E  8B C8			mov		ecx, eax
+ 00000120  58				pop		eax
+ 00000121  03 C1			add		eax, ecx
+ 00000123  8B D0			mov		edx, eax
+ 00000125  59				pop		ecx
+ 00000126  58				pop		eax
+ 00000127  EB 05			jmp		_normal
+ 00000129			_overflow:
  00000129  58				pop		eax
- 0000012A  5F				pop		edi
- 0000012B  EB 2E			jmp		_end
- 0000012D			_endConversion:
- 0000012D  EB 18			jmp		_sizeCheck
- 0000012F			_contEndConv:
- 0000012F  53				push	ebx
- 00000130  50				push	eax
- 00000131  8B 75 1C			mov		esi, [ebp + 28]					; Check if the signBool is 1, if so negate the value
- 00000134  8B 06			mov		eax, [esi]
- 00000136  BB 00000001			mov		ebx, 1
- 0000013B  3B D8			cmp		ebx, eax
- 0000013D  58				pop		eax
- 0000013E  5B				pop		ebx
- 0000013F  74 02			je		_negate
- 00000141  EB 0F			jmp		_storeToMem
- 00000143			_negate:
- 00000143  F7 DA			neg		edx
- 00000145  EB 0B			jmp		_storeToMem
- 00000147			_sizeCheck:
- 00000147  B8 7FFFFFFF			mov		eax, MAX_SIZE_REG
- 0000014C  3B D0			cmp		edx, eax
- 0000014E  77 CD			ja		_invalid
- 00000150  EB DD			jmp		_contEndConv
- 00000152			_storeToMem:
- 00000152  57				push	edi
- 00000153  8B 7D 24			mov		SDWORD ptr edi, [ebp + 36]		; validatedInput offset - repeatedly overwrites previous value
- 00000156  89 17			mov		[edi], edx
- 00000158  5F				pop		edi
- 00000159  EB 00			jmp		_end
- 0000015B			_end:
- 0000015B  61				popad
- 0000015C  5D				pop		ebp
- 0000015D  C2 0020			ret	32
- 00000160			ReadVal	ENDP
+ 0000012A  59				pop		ecx
+ 0000012B  58				pop		eax
+ 0000012C  EB 1E			jmp		_invalid
+ 0000012E			_normal:
+ 0000012E  E2 D4			loop	_beginConversion
+ 00000130  EB 2A			jmp		_endConversion
+ 00000132			_checkSigns:
+ 00000132  3C 2D			cmp		al, 45
+ 00000134  74 06			je		_setSign
+ 00000136  3C 2B			cmp		al, 43
+ 00000138  75 12			jne		_invalid
+ 0000013A  E2 C8			loop	_beginConversion
+ 0000013C			_setSign:
+ 0000013C  57				push	edi
+ 0000013D  50				push	eax
+ 0000013E  8B 7D 1C			mov		edi, [ebp+28]
+ 00000141  B8 00000001			mov		eax, 1
+ 00000146  89 07			mov		[edi], eax
+ 00000148  58				pop		eax
+ 00000149  5F				pop		edi
+ 0000014A  E2 B8			loop	_beginConversion
+ 0000014C			_invalid:
+ 0000014C  57				push	edi
+ 0000014D  50				push	eax
+ 0000014E  8B 7D 20			mov		edi, [ebp + 32]					; Set the invalidBool to 1
+ 00000151  B8 00000001			mov		eax, 1
+ 00000156  89 07			mov		[edi], eax
+ 00000158  58				pop		eax
+ 00000159  5F				pop		edi
+ 0000015A  EB 4D			jmp		_end
+ 0000015C			_endConversion:
+ 0000015C  EB 18			jmp		_sizeCheck
+ 0000015E			_contEndConv:
+ 0000015E  53				push	ebx
+ 0000015F  50				push	eax
+ 00000160  8B 75 1C			mov		esi, [ebp + 28]					; Check if the signBool is 1, if so negate the value
+ 00000163  8B 06			mov		eax, [esi]
+ 00000165  BB 00000001			mov		ebx, 1
+ 0000016A  3B D8			cmp		ebx, eax
+ 0000016C  58				pop		eax
+ 0000016D  5B				pop		ebx
+ 0000016E  74 02			je		_negate
+ 00000170  EB 2E			jmp		_storeToMem
+ 00000172			_negate:
+ 00000172  F7 DA			neg		edx
+ 00000174  EB 2A			jmp		_storeToMem
+ 00000176			_sizeCheck:
+ 00000176  56				push	esi
+ 00000177  50				push	eax
+ 00000178  53				push	ebx
+ 00000179  8B 75 1C			mov		esi, [ebp + 28]					; Check if the signBool is 1, if so negate the value
+ 0000017C  8B 06			mov		eax, [esi]
+ 0000017E  BB 00000001			mov		ebx, 1
+ 00000183  3B D8			cmp		ebx, eax
+ 00000185  5B				pop		ebx
+ 00000186  58				pop		eax
+ 00000187  5E				pop		esi
+ 00000188  74 0B			je		_negativeSize
+ 0000018A  B8 7FFFFFFF			mov		eax, MAX_SIZE_REG
+ 0000018F  3B D0			cmp		edx, eax
+ 00000191  77 B9			ja		_invalid
+ 00000193  EB C9			jmp		_contEndConv
+ 00000195			_negativeSize:
+ 00000195  B8 80000000			mov		eax, MAX_NEG_SIZE_REG
+ 0000019A  3B D0			cmp		edx, eax
+ 0000019C  77 AE			ja		_invalid
+ 0000019E  EB BE			jmp		_contEndConv
+ 000001A0			_storeToMem:
+ 000001A0  57				push	edi
+ 000001A1  8B 7D 24			mov		SDWORD ptr edi, [ebp + 36]		; validatedInput offset - repeatedly overwrites previous value
+ 000001A4  89 17			mov		[edi], edx
+ 000001A6  5F				pop		edi
+ 000001A7  EB 00			jmp		_end
+ 000001A9			_end:
+ 000001A9  61				popad
+ 000001AA  5D				pop		ebp
+ 000001AB  C2 0020			ret	32
+ 000001AE			ReadVal	ENDP
 
- 00000160			WriteVal PROC
- 00000160  55				push	ebp
- 00000161  8B EC			mov		ebp, esp
- 00000163  8B 7D 0C			mov		edi, [ebp + 12]
- 00000166  8B 75 08			mov		esi, [ebp + 8]
- 00000169  BB 0000000A			mov		ebx, 10
- 0000016E  8B 06			mov		eax, [esi]
- 00000170  B9 00000000			mov		ecx, 0
- 00000175			_startDivision:
- 00000175  83 F9 00			cmp		ecx, 0
- 00000178  7F 02			jg		_updateDividend
- 0000017A  EB 02			jmp		_innerLoop
- 0000017C			_updateDividend:
- 0000017C  8B C2			mov		eax, edx
- 0000017E				_innerLoop:
- 0000017E  83 FA 00			cmp		edx, 0
- 00000181  74 0B			je		_break
- 00000183  BA 00000000			mov		edx, 0
- 00000188  F7 F3			div		ebx
- 0000018A  41				inc		ecx
- 0000018B  AA				stosb
- 0000018C  EB E7			jmp		_startDivision
- 0000018E				_break:
- 0000018E  5D				pop		ebp
- 0000018F  C2 0004			ret 4
- 00000192			writeVal ENDP
+ 000001AE			calcSum PROC
+ 000001AE  55				push	ebp
+ 000001AF  8B EC			mov		ebp, esp
+ 000001B1  E8 00000000 E		call	Crlf
+					mDisplayString
+ 000001B6		     1	_nextInString:
+ 000001B6  8B 55 0C	     1		mov		edx, [ebp + 12]
+ 000001B9  E8 00000000 E     1		call	WriteString
+ 000001BE  B0 20	     1		mov		al, ' '
+ 000001C0  E8 00000000 E     1		call	WriteChar
+ 000001C5  60				pushad
+ 000001C6  8B 7D 08			mov		edi, [ebp + 8]
+ 000001C9  B9 00000000			mov		ecx, 0
+ 000001CE  BA 00000000			mov		edx, 0
+ 000001D3			_sum:
+ 000001D3  8B 07			mov		eax, [edi]
+ 000001D5  8B 5F 04			mov		ebx, [edi + TYPE validInputs]
+ 000001D8  03 C3			add		eax, ebx
+ 000001DA  03 D0			add		edx, eax
+ 000001DC  83 C1 02			add		ecx, 2
+ 000001DF  83 F9 0A			cmp		ecx, 10
+ 000001E2  74 05			je		_endOfSum
+ 000001E4  83 C7 08			add		edi, 2*TYPE validInputs
+ 000001E7  EB EA			jmp		_sum
+ 000001E9			_endOfSum:
+ 000001E9  8B C2			mov		eax, edx
+ 000001EB  E8 00000000 E		call	WriteInt
+ 000001F0  61				popad
+ 000001F1  5D				pop		ebp
+ 000001F2  C2 0008			ret		8
+ 000001F5			calcSum	ENDP	
+
+ 000001F5			convertToASCII PROC
+ 000001F5  55				push	ebp
+ 000001F6  8B EC			mov		ebp, esp
+ 000001F8  60				pushad
+ 000001F9  8B 75 08			mov		esi, [ebp + 8]
+ 000001FC  8B FE			mov		edi, esi
+ 000001FE  8B 45 0C			mov		eax, [ebp + 12]
+ 00000201  8B 08			mov		ecx, [eax]
+ 00000203			_comparisons:
+ 00000203  83 F9 00			cmp		ecx, 0
+ 00000206  0F 84 000000D0		je		_endOfComparisons
+ 0000020C  8A 06			mov		al, [esi]
+ 0000020E  3C 2D			cmp		al, 45
+ 00000210  74 02			je		_negative
+ 00000212  EB 08			jmp		_numbers
+ 00000214			_negative:
+ 00000214  83 C7 01			add		edi, 1
+ 00000217  83 C6 01			add		esi, 1
+ 0000021A  EB E7			jmp		_comparisons
+ 0000021C			_numbers:
+ 0000021C  3C 01			cmp		al, 1
+ 0000021E  74 28			je		_one
+ 00000220  3C 02			cmp		al, 2
+ 00000222  74 31			je		_two
+ 00000224  3C 03			cmp		al, 3
+ 00000226  74 3A			je		_three
+ 00000228  3C 04			cmp		al, 4
+ 0000022A  74 43			je		_four
+ 0000022C  3C 05			cmp		al, 5
+ 0000022E  74 4C			je		_five
+ 00000230  3C 06			cmp		al, 6
+ 00000232  74 58			je		_six
+ 00000234  3C 07			cmp		al, 7
+ 00000236  74 64			je		_seven
+ 00000238  3C 08			cmp		al, 8
+ 0000023A  74 70			je		_eight
+ 0000023C  3C 09			cmp		al, 9
+ 0000023E  74 7C			je		_nine
+ 00000240  3C 00			cmp		al, 0
+ 00000242  0F 84 00000084		je		_zero
+ 00000248			_one:
+ 00000248  B3 31			mov		bl, 49
+ 0000024A  88 1F			mov		[edi], bl
+ 0000024C  83 C7 01			add		edi, 1
+ 0000024F  83 C6 01			add		esi, 1
+ 00000252  49				dec		ecx
+ 00000253  EB AE			jmp		_comparisons
+ 00000255			_two:
+ 00000255  B3 32			mov		bl, 50
+ 00000257  88 1F			mov		[edi], bl
+ 00000259  83 C7 01			add		edi, 1
+ 0000025C  83 C6 01			add		esi, 1
+ 0000025F  49				dec		ecx
+ 00000260  EB A1			jmp		_comparisons
+ 00000262			_three:
+ 00000262  B3 33			mov		bl, 51
+ 00000264  88 1F			mov		[edi], bl
+ 00000266  83 C7 01			add		edi, 1
+ 00000269  83 C6 01			add		esi, 1
+ 0000026C  49				dec		ecx
+ 0000026D  EB 94			jmp		_comparisons
+ 0000026F			_four:
+ 0000026F  B3 34			mov		bl, 52
+ 00000271  88 1F			mov		[edi], bl
+ 00000273  83 C7 01			add		edi, 1
+ 00000276  83 C6 01			add		esi, 1
+ 00000279  49				dec		ecx
+ 0000027A  EB 87			jmp		_comparisons
+ 0000027C			_five:
+ 0000027C  B3 35			mov		bl, 53
+ 0000027E  88 1F			mov		[edi], bl
+ 00000280  83 C7 01			add		edi, 1
+ 00000283  83 C6 01			add		esi, 1
+ 00000286  49				dec		ecx
+ 00000287  E9 FFFFFF77			jmp		_comparisons
+ 0000028C			_six:
+ 0000028C  B3 36			mov		bl, 54
+ 0000028E  88 1F			mov		[edi], bl
+ 00000290  83 C7 01			add		edi, 1
+ 00000293  83 C6 01			add		esi, 1
+ 00000296  49				dec		ecx
+ 00000297  E9 FFFFFF67			jmp		_comparisons
+ 0000029C			_seven:
+ 0000029C  B3 37			mov		bl, 55
+ 0000029E  88 1F			mov		[edi], bl
+ 000002A0  83 C7 01			add		edi, 1
+ 000002A3  83 C6 01			add		esi, 1
+ 000002A6  49				dec		ecx
+ 000002A7  E9 FFFFFF57			jmp		_comparisons
+ 000002AC			_eight:
+ 000002AC  B3 38			mov		bl, 56
+ 000002AE  88 1F			mov		[edi], bl
+ 000002B0  83 C7 01			add		edi, 1
+ 000002B3  83 C6 01			add		esi, 1
+ 000002B6  49				dec		ecx
+ 000002B7  E9 FFFFFF47			jmp		_comparisons
+ 000002BC			_nine:
+ 000002BC  B3 39			mov		bl, 57
+ 000002BE  88 1F			mov		[edi], bl
+ 000002C0  83 C7 01			add		edi, 1
+ 000002C3  83 C6 01			add		esi, 1
+ 000002C6  49				dec		ecx
+ 000002C7  E9 FFFFFF37			jmp		_comparisons
+ 000002CC			_zero:
+ 000002CC  B3 30			mov		bl, 48
+ 000002CE  88 1F			mov		[edi], bl
+ 000002D0  83 C7 01			add		edi, 1
+ 000002D3  83 C6 01			add		esi, 1
+ 000002D6  49				dec		ecx
+ 000002D7  E9 FFFFFF27			jmp		_comparisons
+ 000002DC			_endOfComparisons:
+ 000002DC  61				popad
+ 000002DD  5D				pop		ebp
+ 000002DE  C2 0008			ret		8
+ 000002E1			convertToASCII ENDP
+
+ 000002E1			clearBuffer PROC
+ 000002E1  55				push	ebp
+ 000002E2  8B EC			mov		ebp, esp
+ 000002E4  60				pushad
+ 000002E5  8B 75 08			mov		esi, [ebp + 8]
+ 000002E8  B9 0000000C			mov		ecx, 12
+ 000002ED			_clearLoop:
+ 000002ED  B8 00000000			mov		eax, 0
+ 000002F2  89 06			mov		[esi], eax						; Repeatedly adds zero the the array position pointed to by esi
+ 000002F4  46				inc		esi
+ 000002F5  E2 F6			loop	_clearLoop
+ 000002F7  61				popad
+ 000002F8  5D				pop		ebp
+ 000002F9  C2 0004			ret		4
+ 000002FC			clearBuffer ENDP
 
 
+
+ 000002FC			WriteVal PROC
+ 000002FC  55				push	ebp
+ 000002FD  8B EC			mov		ebp, esp
+ 000002FF  8B 7D 0C			mov		edi, [ebp + 12]
+ 00000302  8B 75 08			mov		esi, [ebp + 8]
+ 00000305  50				push	eax
+ 00000306  52				push	edx
+ 00000307  53				push	ebx
+ 00000308  B8 00000004			mov		eax, 4							; As we iterate in the main procedure, we will track which iteration we are on via ebx and then add 4x[ebx] to the esi pointer so that we are capturing each element of thea array
+ 0000030D  F7 E3			mul		ebx
+ 0000030F  03 F0			add		esi, eax
+ 00000311  5B				pop		ebx
+ 00000312  5A				pop		edx
+ 00000313  58				pop		eax
+ 00000314  60				pushad
+ 00000315  BB 0000000A			mov		ebx, 10
+ 0000031A  B9 00000000			mov		ecx, 0
+ 0000031F			_divStart:
+ 0000031F  8B 06			mov		eax, [esi]
+ 00000321  83 F8 00			cmp		eax, 0
+ 00000324  7C 11			jl		_invert
+ 00000326			_resumeWithDiv:
+ 00000326  FC				cld
+ 00000327			_divRemaining:
+ 00000327  41				inc		ecx
+ 00000328  BA 00000000			mov		edx, 0
+ 0000032D  F7 F3			div		ebx
+ 0000032F  52				push	edx
+ 00000330  83 F8 00			cmp		eax, 0
+ 00000333  74 14			je		_doneDiv
+ 00000335  EB F0			jmp		_divRemaining
+ 00000337			_invert:									; If a negative value is added, updates the sign boolean global and then negates the value
+ 00000337  50				push	eax
+ 00000338  56				push	esi
+ 00000339  8B 75 10			mov		esi, [ebp + 16]
+ 0000033C  B8 00000001			mov		eax, 1
+ 00000341  89 06			mov		[esi], eax
+ 00000343  5E				pop		esi
+ 00000344  58				pop		eax
+ 00000345  F7 D8			neg		eax
+ 00000347  EB DD			jmp		_resumeWithDiv
+ 00000349			_doneDiv:
+ 00000349  57				push	edi
+ 0000034A  53				push	ebx
+ 0000034B  8B 7D 10			mov		edi, [ebp + 16]
+ 0000034E  8B 1F			mov		ebx, [edi]
+ 00000350  83 FB 01			cmp		ebx, 1							; Checking for sign boolean flag that, if set, will jump to _addSign and push the negative sign value that will be added to the string
+ 00000353  5B				pop		ebx
+ 00000354  5F				pop		edi
+ 00000355  74 10			je		_addSign
+ 00000357			_storeSize:									; Stores the size of the user input array which will be used in the conversion of ascii values
+ 00000357  60				pushad
+ 00000358  8B 7D 14			mov		edi, [ebp + 20]
+ 0000035B  B8 00000000			mov		eax, 0
+ 00000360  89 07			mov		[edi], eax
+ 00000362  89 0F			mov		[edi], ecx
+ 00000364  61				popad
+ 00000365  EB 08			jmp		_resumeBufferAdding
+ 00000367			_addSign:
+ 00000367  B8 0000002D			mov		eax, 45
+ 0000036C  AA				stosb
+ 0000036D  EB E8			jmp		_storeSize
+ 0000036F			_resumeBufferAdding:
+ 0000036F  58				pop		eax
+ 00000370  AA				stosb
+ 00000371  E2 FC			loop	_resumeBufferAdding
+ 00000373  FF 75 14			push	[ebp + 20]
+ 00000376  FF 75 0C			push	[ebp + 12]
+ 00000379  E8 FFFFFE77			call	convertToASCII					; Calling a subprocedure to convert the values to their ASCII representation
+					mDisplayString
+ 0000037E		     1	_nextInString:
+ 0000037E  8B 55 0C	     1		mov		edx, [ebp + 12]
+ 00000381  E8 00000000 E     1		call	WriteString
+ 00000386  B0 20	     1		mov		al, ' '
+ 00000388  E8 00000000 E     1		call	WriteChar
+ 0000038D  FF 75 0C			push	[ebp + 12]
+ 00000390  E8 FFFFFF4C			call	clearBuffer						; Calling a subprocedure to clear the asciiOutBuffer so that values do not remain for the next iteration
+ 00000395  61				popad
+ 00000396  5D				pop		ebp
+ 00000397  C2 0010			ret		16
+ 0000039A			writeVal ENDP
 
 				END main
-Microsoft (R) Macro Assembler Version 14.28.29913.0	    05/28/21 15:26:06
+Microsoft (R) Macro Assembler Version 14.28.29913.0	    06/03/21 17:36:33
 <Designing low-level I/O procedures      (Proj6_934329706.as  Symbols 2 - 1
 
 
@@ -536,8 +797,8 @@ Segments and Groups:
 
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
-_DATA  . . . . . . . . . . . . .	32 Bit	 00000280 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 00000192 Para	  Public  'CODE'	
+_DATA  . . . . . . . . . . . . .	32 Bit	 00000281 Para	  Public  'DATA'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 0000039A Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
@@ -607,18 +868,21 @@ ReadInt  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 ReadKeyFlush . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadKey  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadString . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-ReadVal  . . . . . . . . . . . .	P Near	 00000097 _TEXT	Length= 000000C9 Public STDCALL
-  _beginConversion . . . . . . .	L Near	 000000DE _TEXT	
-  _validate  . . . . . . . . . .	L Near	 000000DF _TEXT	
-  _checkSigns  . . . . . . . . .	L Near	 00000103 _TEXT	
-  _setSign . . . . . . . . . . .	L Near	 0000010D _TEXT	
-  _invalid . . . . . . . . . . .	L Near	 0000011D _TEXT	
-  _endConversion . . . . . . . .	L Near	 0000012D _TEXT	
-  _contEndConv . . . . . . . . .	L Near	 0000012F _TEXT	
-  _negate  . . . . . . . . . . .	L Near	 00000143 _TEXT	
-  _sizeCheck . . . . . . . . . .	L Near	 00000147 _TEXT	
-  _storeToMem  . . . . . . . . .	L Near	 00000152 _TEXT	
-  _end . . . . . . . . . . . . .	L Near	 0000015B _TEXT	
+ReadVal  . . . . . . . . . . . .	P Near	 000000BD _TEXT	Length= 000000F1 Public STDCALL
+  _beginConversion . . . . . . .	L Near	 00000104 _TEXT	
+  _validate  . . . . . . . . . .	L Near	 00000105 _TEXT	
+  _overflow  . . . . . . . . . .	L Near	 00000129 _TEXT	
+  _normal  . . . . . . . . . . .	L Near	 0000012E _TEXT	
+  _checkSigns  . . . . . . . . .	L Near	 00000132 _TEXT	
+  _setSign . . . . . . . . . . .	L Near	 0000013C _TEXT	
+  _invalid . . . . . . . . . . .	L Near	 0000014C _TEXT	
+  _endConversion . . . . . . . .	L Near	 0000015C _TEXT	
+  _contEndConv . . . . . . . . .	L Near	 0000015E _TEXT	
+  _negate  . . . . . . . . . . .	L Near	 00000172 _TEXT	
+  _sizeCheck . . . . . . . . . .	L Near	 00000176 _TEXT	
+  _negativeSize  . . . . . . . .	L Near	 00000195 _TEXT	
+  _storeToMem  . . . . . . . . .	L Near	 000001A0 _TEXT	
+  _end . . . . . . . . . . . . .	L Near	 000001A9 _TEXT	
 SetConsoleCursorInfo . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleCursorPosition . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleMode . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -655,17 +919,44 @@ WriteStackFrameName  . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 WriteStackFrame  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteString  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteToFile  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-WriteVal . . . . . . . . . . . .	P Near	 00000160 _TEXT	Length= 00000032 Public STDCALL
-  _startDivision . . . . . . . .	L Near	 00000175 _TEXT	
-  _updateDividend  . . . . . . .	L Near	 0000017C _TEXT	
-  _innerLoop . . . . . . . . . .	L Near	 0000017E _TEXT	
-  _break . . . . . . . . . . . .	L Near	 0000018E _TEXT	
+WriteVal . . . . . . . . . . . .	P Near	 000002FC _TEXT	Length= 0000009E Public STDCALL
+  _divStart  . . . . . . . . . .	L Near	 0000031F _TEXT	
+  _resumeWithDiv . . . . . . . .	L Near	 00000326 _TEXT	
+  _divRemaining  . . . . . . . .	L Near	 00000327 _TEXT	
+  _invert  . . . . . . . . . . .	L Near	 00000337 _TEXT	
+  _doneDiv . . . . . . . . . . .	L Near	 00000349 _TEXT	
+  _storeSize . . . . . . . . . .	L Near	 00000357 _TEXT	
+  _addSign . . . . . . . . . . .	L Near	 00000367 _TEXT	
+  _resumeBufferAdding  . . . . .	L Near	 0000036F _TEXT	
+  _nextInString  . . . . . . . .	L Near	 0000037E _TEXT	
 WriteWindowsMsg  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000097 Public STDCALL
+calcSum  . . . . . . . . . . . .	P Near	 000001AE _TEXT	Length= 00000047 Public STDCALL
+  _nextInString  . . . . . . . .	L Near	 000001B6 _TEXT	
+  _sum . . . . . . . . . . . . .	L Near	 000001D3 _TEXT	
+  _endOfSum  . . . . . . . . . .	L Near	 000001E9 _TEXT	
+clearBuffer  . . . . . . . . . .	P Near	 000002E1 _TEXT	Length= 0000001B Public STDCALL
+  _clearLoop . . . . . . . . . .	L Near	 000002ED _TEXT	
+convertToASCII . . . . . . . . .	P Near	 000001F5 _TEXT	Length= 000000EC Public STDCALL
+  _comparisons . . . . . . . . .	L Near	 00000203 _TEXT	
+  _negative  . . . . . . . . . .	L Near	 00000214 _TEXT	
+  _numbers . . . . . . . . . . .	L Near	 0000021C _TEXT	
+  _one . . . . . . . . . . . . .	L Near	 00000248 _TEXT	
+  _two . . . . . . . . . . . . .	L Near	 00000255 _TEXT	
+  _three . . . . . . . . . . . .	L Near	 00000262 _TEXT	
+  _four  . . . . . . . . . . . .	L Near	 0000026F _TEXT	
+  _five  . . . . . . . . . . . .	L Near	 0000027C _TEXT	
+  _six . . . . . . . . . . . . .	L Near	 0000028C _TEXT	
+  _seven . . . . . . . . . . . .	L Near	 0000029C _TEXT	
+  _eight . . . . . . . . . . . .	L Near	 000002AC _TEXT	
+  _nine  . . . . . . . . . . . .	L Near	 000002BC _TEXT	
+  _zero  . . . . . . . . . . . .	L Near	 000002CC _TEXT	
+  _endOfComparisons  . . . . . .	L Near	 000002DC _TEXT	
+main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 000000BD Public STDCALL
   _programLoop . . . . . . . . .	L Near	 00000029 _TEXT	
   _notValid  . . . . . . . . . .	L Near	 00000066 _TEXT	
   _resume  . . . . . . . . . . .	L Near	 00000072 _TEXT	
   _end . . . . . . . . . . . . .	L Near	 00000081 _TEXT	
+  _loop  . . . . . . . . . . . .	L Near	 0000008B _TEXT	
 printf . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
 scanf  . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
 wsprintfA  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
@@ -757,6 +1048,7 @@ KEY_EVENT  . . . . . . . . . . .	Number	 00000001h
 KEY_MASKS  . . . . . . . . . . .	Number	 0000001Fh   
 LEFT_ALT_PRESSED . . . . . . . .	Number	 00000002h   
 LEFT_CTRL_PRESSED  . . . . . . .	Number	 00000008h   
+MAX_NEG_SIZE_REG . . . . . . . .	Number	 -80000000h   
 MAX_SIZE_REG . . . . . . . . . .	Number	 7FFFFFFFh   
 MB_ABORTRETRYIGNORE  . . . . . .	Number	 00000002h   
 MB_APPLMODAL . . . . . . . . . .	Number	 00000000h   
@@ -885,6 +1177,7 @@ VK_UP  . . . . . . . . . . . . .	Number	 00000026h
 WINDOW_BUFFER_SIZE_EVENT . . . .	Number	 00000004h   
 WriteConsoleOutputCharacter  . .	Text   	 WriteConsoleOutputCharacterA
 WriteConsole . . . . . . . . . .	Text   	 WriteConsoleA
+arraySize  . . . . . . . . . . .	Byte	 0000027E _DATA	
 asciiOutBuffer . . . . . . . . .	Byte	 0000026E _DATA	
 black  . . . . . . . . . . . . .	Number	 00000000h   
 blue . . . . . . . . . . . . . .	Number	 00000001h   
@@ -897,7 +1190,7 @@ exit . . . . . . . . . . . . . .	Text   	 INVOKE ExitProcess,0
 gray . . . . . . . . . . . . . .	Number	 00000008h   
 green  . . . . . . . . . . . . .	Number	 00000002h   
 inputBuffer  . . . . . . . . . .	Byte	 00000261 _DATA	
-invalidBool  . . . . . . . . . .	Byte	 0000027F _DATA	
+invalidBool  . . . . . . . . . .	Byte	 00000280 _DATA	
 lightBlue  . . . . . . . . . . .	Number	 00000009h   
 lightCyan  . . . . . . . . . . .	Number	 0000000Bh   
 lightGray  . . . . . . . . . . .	Number	 00000007h   
@@ -909,7 +1202,7 @@ numbOfBytes  . . . . . . . . . .	Byte	 0000026D _DATA
 programInfo  . . . . . . . . . .	Byte	 00000000 _DATA	
 programRules . . . . . . . . . .	Byte	 00000055 _DATA	
 red  . . . . . . . . . . . . . .	Number	 00000004h   
-signBool . . . . . . . . . . . .	Byte	 0000027E _DATA	
+signBool . . . . . . . . . . . .	Byte	 0000027F _DATA	
 thanks . . . . . . . . . . . . .	Byte	 00000225 _DATA	
 theRoundAvg  . . . . . . . . . .	Byte	 0000020C _DATA	
 theSumOfNums . . . . . . . . . .	Byte	 000001EE _DATA	

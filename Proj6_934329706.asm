@@ -1,7 +1,7 @@
 TITLE Designing low-level I/O procedures      (Proj6_934329706.asm)
 
 ; Author: Jacob Ogle
-; Last Modified: May 24th, 2021
+; Last Modified: June 3rd, 2021
 ; OSU email address: ogleja@oregonstate.edu
 ; Course number/section:   CS271 Section 400
 ; Project Number: 6                Due Date: June 6th 2021
@@ -32,7 +32,7 @@ mGetString MACRO
 	call	WriteString
 	; Read user input string to inputBuffer
 	mov		edx, [ebp + 20]
-	mov		ecx, SIZEOF	inputBuffer
+	mov		ecx, 12							; Size of the input buffer
 	call	ReadString
 	; Store number of input bytes to the numbOfBytes mem location
 	mov		edi, [ebp + 24]
@@ -58,10 +58,13 @@ mDisplayString MACRO
 _nextInString:
 	mov		edx, [ebp + 12]
 	call	WriteString
+	mov		al, ' '
+	call	WriteChar
 ENDM
 
 ; Constants
 MAX_SIZE_REG = 2147483647
+MAX_NEG_SIZE_REG = 2147483648
 
 .data
 ; Prompts
@@ -87,6 +90,7 @@ asciiOutBuffer	BYTE	12 DUP(?)
 
 ; Values
 validatedInput	SDWORD	?				; Stores the validated input from ReadVal
+arraySize		BYTE	?				; Stores the number of elements a user inputs
 
 ; Boolean Flags
 signBool		BYTE	0
@@ -134,10 +138,16 @@ _resume:
 	jmp		_programLoop
 _end:
 	; End of getting user data - Next is to Display these values using WriteVal
+	mov		ecx, 10
+	mov		ebx, 0
+_loop:
+	push	offset arraySize
 	push	offset signBool
 	push	offset asciiOutBuffer
 	push	offset validInputs
 	call	WriteVal
+	inc		ebx
+	loop	_loop
 
 	push	offset theSumOfNums
 	push	offset validInputs
@@ -195,12 +205,20 @@ _validate:
 	mov		eax, 10
 	mov		ecx, edx
 	mul		ecx
+	jo		_overflow
 	mov		ecx, eax
 	pop		eax
 	add		eax, ecx
 	mov		edx, eax
 	pop		ecx
 	pop		eax
+	jmp		_normal
+_overflow:
+	pop		eax
+	pop		ecx
+	pop		eax
+	jmp		_invalid
+_normal:
 	loop	_beginConversion
 	jmp		_endConversion
 _checkSigns:
@@ -244,7 +262,23 @@ _negate:
 	neg		edx
 	jmp		_storeToMem
 _sizeCheck:
+	push	esi
+	push	eax
+	push	ebx
+	mov		esi, [ebp + 28]					; Check if the signBool is 1, if so negate the value
+	mov		eax, [esi]
+	mov		ebx, 1
+	cmp		ebx, eax
+	pop		ebx
+	pop		eax
+	pop		esi
+	je		_negativeSize
 	mov		eax, MAX_SIZE_REG
+	cmp		edx, eax
+	ja		_invalid
+	jmp		_contEndConv
+_negativeSize:
+	mov		eax, MAX_NEG_SIZE_REG
 	cmp		edx, eax
 	ja		_invalid
 	jmp		_contEndConv
@@ -282,22 +316,163 @@ _sum:
 _endOfSum:
 	mov		eax, edx
 	call	WriteInt
-
 	popad
 	pop		ebp
 	ret		8
 calcSum	ENDP	
 
+convertToASCII PROC
+	push	ebp
+	mov		ebp, esp
+	pushad
+	mov		esi, [ebp + 8]
+	mov		edi, esi
+	mov		eax, [ebp + 12]
+	mov		ecx, [eax]
+_comparisons:
+	cmp		ecx, 0
+	je		_endOfComparisons
+	mov		al, [esi]
+	cmp		al, 45
+	je		_negative
+	jmp		_numbers
+_negative:
+	add		edi, 1
+	add		esi, 1
+	jmp		_comparisons
+_numbers:
+	cmp		al, 1
+	je		_one
+	cmp		al, 2
+	je		_two
+	cmp		al, 3
+	je		_three
+	cmp		al, 4
+	je		_four
+	cmp		al, 5
+	je		_five
+	cmp		al, 6
+	je		_six
+	cmp		al, 7
+	je		_seven
+	cmp		al, 8
+	je		_eight
+	cmp		al, 9
+	je		_nine
+	cmp		al, 0
+	je		_zero
+_one:
+	mov		bl, 49
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_two:
+	mov		bl, 50
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_three:
+	mov		bl, 51
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_four:
+	mov		bl, 52
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_five:
+	mov		bl, 53
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_six:
+	mov		bl, 54
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_seven:
+	mov		bl, 55
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_eight:
+	mov		bl, 56
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_nine:
+	mov		bl, 57
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_zero:
+	mov		bl, 48
+	mov		[edi], bl
+	add		edi, 1
+	add		esi, 1
+	dec		ecx
+	jmp		_comparisons
+_endOfComparisons:
+	popad
+	pop		ebp
+	ret		8
+convertToASCII ENDP
+
+clearBuffer PROC
+	push	ebp
+	mov		ebp, esp
+	pushad
+	mov		esi, [ebp + 8]
+	mov		ecx, 12
+_clearLoop:
+	mov		eax, 0
+	mov		[esi], eax						; Repeatedly adds zero the the array position pointed to by esi
+	inc		esi
+	loop	_clearLoop
+	popad
+	pop		ebp
+	ret		4
+clearBuffer ENDP
+
+
 
 WriteVal PROC
 	push	ebp
 	mov		ebp, esp
-	push	edi
 	mov		edi, [ebp + 12]
+	mov		esi, [ebp + 8]
+	push	eax
+	push	edx
+	push	ebx
+	mov		eax, 4							; As we iterate in the main procedure, we will track which iteration we are on via ebx and then add 4x[ebx] to the esi pointer so that we are capturing each element of thea array
+	mul		ebx
+	add		esi, eax
+	pop		ebx
+	pop		edx
+	pop		eax
+	pushad
 	mov		ebx, 10
 	mov		ecx, 0
 _divStart:
-	mov		esi, [ebp + 8]
 	mov		eax, [esi]
 	cmp		eax, 0
 	jl		_invert
@@ -306,12 +481,12 @@ _resumeWithDiv:
 _divRemaining:
 	inc		ecx
 	mov		edx, 0
-	idiv	ebx
+	div		ebx
 	push	edx
-	cmp		edx, 1
+	cmp		eax, 0
 	je		_doneDiv
 	jmp		_divRemaining
-_invert:
+_invert:									; If a negative value is added, updates the sign boolean global and then negates the value
 	push	eax
 	push	esi
 	mov		esi, [ebp + 16]
@@ -326,22 +501,35 @@ _doneDiv:
 	push	ebx
 	mov		edi, [ebp + 16]
 	mov		ebx, [edi]
-	cmp		ebx, 1
+	cmp		ebx, 1							; Checking for sign boolean flag that, if set, will jump to _addSign and push the negative sign value that will be added to the string
 	pop		ebx
 	pop		edi
 	je		_addSign
+_storeSize:									; Stores the size of the user input array which will be used in the conversion of ascii values
+	pushad
+	mov		edi, [ebp + 20]
+	mov		eax, 0
+	mov		[edi], eax
+	mov		[edi], ecx
+	popad
+	jmp		_resumeBufferAdding
 _addSign:
 	mov		eax, 45
 	stosb
+	jmp		_storeSize
 _resumeBufferAdding:
 	pop		eax
 	stosb
 	loop	_resumeBufferAdding
-
+	push	[ebp + 20]
+	push	[ebp + 12]
+	call	convertToASCII					; Calling a subprocedure to convert the values to their ASCII representation
 	mDisplayString
-	pop		edi
+	push	[ebp + 12]
+	call	clearBuffer						; Calling a subprocedure to clear the asciiOutBuffer so that values do not remain for the next iteration
+	popad
 	pop		ebp
-	ret		12
+	ret		16
 writeVal ENDP
 
 END main
