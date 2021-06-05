@@ -240,11 +240,17 @@ _normal:
 	jmp		_endConversion
 _checkSigns:
 	cmp		al, 45
-	je		_setSign
+	je		_setSignNeg
 	cmp		al, 43
+	jmp		_noSignAfterFirst
 	jne		_invalid
 	loop	_beginConversion
-_setSign:
+_setSignNeg:
+	push	eax
+	mov		eax, [edi]
+	cmp		eax, ecx
+	pop		eax
+	jne		_invalid
 	push	edi
 	push	eax
 	mov		edi, [ebp+28]
@@ -252,6 +258,13 @@ _setSign:
 	mov		[edi], eax
 	pop		eax
 	pop		edi
+	loop	_beginConversion
+_noSignAfterFirst:
+	push	eax
+	mov		eax, [edi]
+	cmp		eax, ecx
+	pop		eax
+	jne		_invalid
 	loop	_beginConversion
 _invalid:
 	push	edi
