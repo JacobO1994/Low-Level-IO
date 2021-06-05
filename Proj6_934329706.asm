@@ -32,7 +32,7 @@ mGetString MACRO
 	call	WriteString
 	; Read user input string to inputBuffer
 	mov		edx, [ebp + 20]
-	mov		ecx, 12							; Size of the input buffer
+	mov		ecx, 13							; Size of the input buffer
 	call	ReadString
 	; Store number of input bytes to the numbOfBytes mem location
 	mov		edi, [ebp + 24]
@@ -55,8 +55,7 @@ ENDM
 ; Returns:
 ; ---------------------------------------------------------------------------------
 mDisplayString MACRO
-_nextInString:
-	mov		edx, [ebp + 12]
+	pop		edx
 	call	WriteString
 	mov		al, ' '
 	call	WriteChar
@@ -68,11 +67,11 @@ MAX_NEG_SIZE_REG = 2147483648
 
 .data
 ; Prompts
-programInfo		BYTE	"PROGRAMMING ASSIGNMENT 6: Designing low-level I/O procedures",
+programInfo		BYTE	"PROGRAMMING ASSIGNMENT 6: Designing low-level I/O procedures ",
 						"Written by: Jacob Ogle",13,10,0	
-programRules	BYTE	"Please provide 10 signed decimal integers. Each number needs",
-						"to be small enough to fit inside a 32 bit register. After you",
-						"have finished inputting the raw numbers I will display a list",
+programRules	BYTE	"Please provide 10 signed decimal integers. Each number needs ",
+						"to be small enough to fit inside a 32 bit register. After you ",
+						"have finished inputting the raw numbers I will display a list ",
 						"of the integers, their sum, and their average value.",13,10,0
 enterInteger	BYTE	"Please enter an signed number: ",0
 errorMsg		BYTE	"ERROR: You did not enter a signed number or your number was too big. - try again",13,10,0
@@ -80,17 +79,19 @@ tryAgain		BYTE	"Please try again: ",0
 enteredFollo	BYTE	"You entered the following numbers: ",13,10,0
 theSumOfNums	BYTE	"The sum of these numbers is: ",0
 theRoundAvg		BYTE	"The rounded average is: ",0
-thanks			BYTE	"Thanks for playing!",0
+thanks			BYTE	"Thanks for reading and grading this nauseating 'program'. I suck at assembly, but loved the course. ",0
 
 ; Arrays
 validInputs		SDWORD	10 DUP(?)
-inputBuffer		BYTE	12 DUP(0)
+inputBuffer		BYTE	13 DUP(0)
 numbOfBytes		BYTE	?
 asciiOutBuffer	BYTE	12 DUP(?)
 
 ; Values
 validatedInput	SDWORD	?				; Stores the validated input from ReadVal
 arraySize		BYTE	?				; Stores the number of elements a user inputs
+sumResult		SDWORD	?
+avgResult		SDWORD	0
 
 ; Boolean Flags
 signBool		BYTE	0
@@ -98,14 +99,12 @@ invalidBool		BYTE	0
 
 .code
 main PROC
-	mov		edx, offset programInfo
-	call	WriteString
+	push	offset programInfo
+	mDisplayString
 	call	Crlf
-
-	mov		edx, offset programRules
-	call	WriteString
-	call	Crlf
-
+	push	offset programRules
+	mDisplayString
+	CALL	Crlf
 	; Test Program - Getting User Data
 	pushad
 	mov		ebx, 0
@@ -126,8 +125,8 @@ _programLoop:
 	je		_notValid
 	jmp		_resume
 _notValid:
-	mov		edx, offset errorMsg
-	call	WriteString
+	push	offset errorMsg
+	mDisplayString
 	jmp		_programLoop
 _resume:
 	mov		SDWORD ptr esi, offset validatedInput
@@ -149,10 +148,28 @@ _loop:
 	inc		ebx
 	loop	_loop
 
+	call	Crlf
+	push	offset arraySize
+	push	offset signBool
+	push	offset asciiOutBuffer
+	push	offset sumResult
 	push	offset theSumOfNums
 	push	offset validInputs
 	call	calcSum
 
+	call	Crlf
+	push	offset arraySize
+	push	offset signBool
+	push	offset asciiOutBuffer
+	push	offset avgResult
+	push	offset sumResult
+	push	offset theRoundAvg
+	call	calcAvg
+
+	call	Crlf
+	push	offset thanks
+	mDisplayString
+	call	Crlf
 	Invoke ExitProcess,0				; exit to operating system
 main ENDP
 
@@ -298,6 +315,7 @@ calcSum PROC
 	push	ebp
 	mov		ebp, esp
 	call	Crlf
+	push	[ebp + 12]
 	mDisplayString
 	pushad
 	mov		edi, [ebp + 8]
@@ -305,21 +323,61 @@ calcSum PROC
 	mov		edx, 0
 _sum:
 	mov		eax, [edi]
-	mov		ebx, [edi + TYPE validInputs]
+	mov		ebx, [edi + 4]
 	add		eax, ebx
 	add		edx, eax
 	add		ecx, 2
 	cmp		ecx, 10
 	je		_endOfSum
-	add		edi, 2*TYPE validInputs
+	add		edi, 2*4
 	jmp		_sum
 _endOfSum:
-	mov		eax, edx
-	call	WriteInt
+	mov		edi, [ebp + 16]
+	mov		[edi], edx
+	mov		edx, [ebp + 16]
+	mov		eax, [edx]
+	push	eax
+	push	edx
+	mov		ebx, 0						; Sorry I really suck at assembly - setting up the stack for WriteVal since it isn't very portable
+	push	[ebp + 28]
+	push	[ebp + 24]
+	push	[ebp + 20]	
+	push	[ebp + 16]
+	call	WriteVal
+	pop		edx
+	pop		eax
+	mov		[edx], eax
+	; Setup the WriteVal function
 	popad
 	pop		ebp
-	ret		8
+	ret		24
 calcSum	ENDP	
+
+calcAvg PROC
+	push	ebp
+	mov		ebp, esp
+	pushad
+	call	Crlf
+	push	[ebp + 8]
+	mDisplayString
+	mov		edi, [ebp + 16]
+	mov		esi, [ebp + 12]
+	mov		eax, [esi]
+	cdq
+	mov		ebx, 10
+	idiv	ebx
+	;	put final avg in eax
+	mov		[edi], eax
+	mov		ebx, 0		
+	push	[ebp + 28]
+	push	[ebp + 24]
+	push	[ebp + 20]	
+	push	[ebp + 16]
+	call	WriteVal
+	popad
+	pop		ebp
+	ret		24
+calcAvg ENDP
 
 convertToASCII PROC
 	push	ebp
@@ -448,12 +506,13 @@ _clearLoop:
 	mov		[esi], eax						; Repeatedly adds zero the the array position pointed to by esi
 	inc		esi
 	loop	_clearLoop
+	mov		edi, [ebp + 12]
+	mov		eax, 0
+	mov		[edi], eax
 	popad
 	pop		ebp
-	ret		4
+	ret		8
 clearBuffer ENDP
-
-
 
 WriteVal PROC
 	push	ebp
@@ -524,7 +583,9 @@ _resumeBufferAdding:
 	push	[ebp + 20]
 	push	[ebp + 12]
 	call	convertToASCII					; Calling a subprocedure to convert the values to their ASCII representation
+	push	[ebp + 12]
 	mDisplayString
+	push	[ebp + 16]						; Clearing the signBool flag also
 	push	[ebp + 12]
 	call	clearBuffer						; Calling a subprocedure to clear the asciiOutBuffer so that values do not remain for the next iteration
 	popad
