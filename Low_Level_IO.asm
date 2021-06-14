@@ -212,7 +212,7 @@ _loop:
 	push	offset theRoundAvg
 	call	calcAvg
 
-	; Thanking the user for using the program (& grader for dealing with this mess)
+	; Thanking the user for using the program
 	call	Crlf
 	call	Crlf
 	push	offset thanks
