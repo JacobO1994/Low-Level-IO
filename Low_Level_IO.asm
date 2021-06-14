@@ -1,10 +1,7 @@
-TITLE Designing low-level I/O procedures      (Proj6_934329706.asm)
+TITLE Designing low-level I/O procedures
 
 ; Author: Jacob Ogle
 ; Last Modified: June 5th, 2021
-; OSU email address: ogleja@oregonstate.edu
-; Course number/section:   CS271 Section 400
-; Project Number: 6                Due Date: June 6th 2021
 ; Description: A low level I/O program that reads a numerical string from a user, and processes the string from it's string form to an actual numerical represnetation. 
 ;	The program will then compute the sum and average of 10 of these values and then output the numbers the user entered, the sum, and the average (floor) as thier
 ;	string form representation. Reading strings and writing strings are handled by user-created (myself) macros and procedures. 
