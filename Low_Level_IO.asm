@@ -110,7 +110,7 @@ tryAgain		BYTE	"Please try again: ",0
 enteredFollo	BYTE	"You entered the following numbers: ",13,10,0
 theSumOfNums	BYTE	"The sum of these numbers is: ",0
 theRoundAvg		BYTE	"The rounded average is: ",0
-thanks			BYTE	"Thanks for reading and grading this nauseating 'program'. I suck at assembly, but loved the course. ",0
+thanks			BYTE	"Thanks for using the program. ",0
 
 ; Arrays
 validInputs		SDWORD	10 DUP(?)		; Stores the valid inputs from the user in their numerical form
@@ -445,7 +445,7 @@ _sum:
 	
 	; End of sum calculation is done - Stroe the result and display the value
 _endOfSum:
-	mov		edi, [ebp + 16]				; Loads offset of sumResult to EDI to store the result
+	mov		edi, [ebp + 16]					; Loads offset of sumResult to EDI to store the result
 	mov		[edi], edx
 	mov		edx, [ebp + 16]
 	mov		eax, [edx]
@@ -453,7 +453,7 @@ _endOfSum:
 	; Writing the Sum value to the console by calling WriteVal
 	push	eax
 	push	edx
-	mov		ebx, 0						; Sorry I really suck at assembly - setting up the stack for WriteVal since it isn't very portable - zero to ebx allows for the sum to be written to the first array element of the osciiOutArray
+	mov		ebx, 0						; setting up the stack for WriteVal since it isn't very portable - zero to ebx allows for the sum to be written to the first array element of the osciiOutArray
 	push	[ebp + 28]
 	push	[ebp + 24]
 	push	[ebp + 20]	
