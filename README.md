@@ -1,4 +1,2 @@
 # Low-Level-IO
-Low Level Programmng 
-
-## Objective
+Low Level Programmng
